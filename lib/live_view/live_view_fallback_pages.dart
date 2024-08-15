@@ -43,7 +43,7 @@ class LiveViewFallbackPages {
       param: url,
       defaultBuilder: () => Builder(
         builder: (context) => Container(
-          color: Theme.of(context).colorScheme.background,
+          color: Theme.of(context).colorScheme.surface,
           child: Center(
             child: CircularProgressIndicator(
               value: liveView.disableAnimations == false ? null : 1,
@@ -62,7 +62,7 @@ class LiveViewFallbackPages {
       param: url,
       defaultBuilder: () => Builder(
         builder: (context) => Container(
-          color: Theme.of(context).colorScheme.background,
+          color: Theme.of(context).colorScheme.surface,
           child: Center(
             child: CircularProgressIndicator(
               value: liveView.disableAnimations == false ? null : 1,

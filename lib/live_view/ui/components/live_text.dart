@@ -6,7 +6,7 @@ import 'package:liveview_flutter/live_view/ui/components/state_widget.dart';
 import 'package:xml/xml.dart';
 
 class LiveText extends LiveStateWidget<LiveText> {
-  const LiveText({required super.state, Key? key}) : super(key: key);
+  const LiveText({super.key, required super.state});
 
   @override
   State<LiveText> createState() => _LiveViewTextState();

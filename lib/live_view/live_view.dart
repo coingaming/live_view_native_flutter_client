@@ -58,13 +58,13 @@ class LiveSocket {
 
         return IOWebSocketChannel.connect(newUri, headers: headers);
       },
-      socketOptions: PhoenixSocketOptions(
-        reconnectDelays: const [
+      socketOptions: const PhoenixSocketOptions(
+        reconnectDelays: [
           Duration.zero,
-          Duration(milliseconds: 1000),
-          Duration(milliseconds: 2000),
-          Duration(milliseconds: 4000),
-          Duration(milliseconds: 8000),
+          Duration(seconds: 1),
+          Duration(seconds: 2),
+          Duration(seconds: 4),
+          Duration(seconds: 8),
         ],
       ),
     );

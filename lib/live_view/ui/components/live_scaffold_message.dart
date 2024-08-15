@@ -23,7 +23,7 @@ class _LiveScaffoldMessageState extends StateWidget<LiveScaffoldMessage> {
     }
 
     Future.microtask(() {
-      ScaffoldMessenger.of(context).clearSnackBars();
+      if (context.mounted) ScaffoldMessenger.of(context).clearSnackBars();
       showScaffold();
     });
   }

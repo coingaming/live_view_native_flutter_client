@@ -15,8 +15,7 @@ class CustomPageTransition extends MaterialPage {
 }
 
 class PageTransition<T> extends MaterialPageRoute<T> {
-  PageTransition({required WidgetBuilder builder, RouteSettings? settings})
-      : super(builder: builder, settings: settings);
+  PageTransition({required super.builder, super.settings});
 
   @override
   get transitionDuration => const Duration(milliseconds: 250);

@@ -47,7 +47,7 @@ abstract class ExecConfirmable extends Exec {
         ],
       ),
     ).then((result) {
-      if (result == true) return handler(context, widget);
+      if (result == true && context.mounted) return handler(context, widget);
     });
   }
 }

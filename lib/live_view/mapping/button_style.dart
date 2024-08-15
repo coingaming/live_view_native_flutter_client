@@ -6,7 +6,7 @@ ButtonStyle? getButtonStyle(BuildContext context, String? style) {
   if (style == null) {
     return null;
   }
-  MaterialStateProperty<TextStyle?>? textStyle;
+  WidgetStateProperty<TextStyle?>? textStyle;
 
   for (var (styleKey, styleValue) in parseCss(style)) {
     switch (styleKey) {

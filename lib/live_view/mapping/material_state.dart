@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 
-MaterialState? getMaterialState(String? value) {
+WidgetState? getWidgetState(String? value) {
   switch (value) {
     case 'disabled':
-      return MaterialState.disabled;
+      return WidgetState.disabled;
     case 'hovered':
-      return MaterialState.hovered;
+      return WidgetState.hovered;
     case 'focused':
-      return MaterialState.focused;
+      return WidgetState.focused;
     case 'pressed':
-      return MaterialState.pressed;
+      return WidgetState.pressed;
     case 'dragged':
-      return MaterialState.dragged;
+      return WidgetState.dragged;
     case 'selected':
-      return MaterialState.selected;
+      return WidgetState.selected;
     case 'scrolledUnder':
-      return MaterialState.scrolledUnder;
+      return WidgetState.scrolledUnder;
     case 'error':
-      return MaterialState.error;
+      return WidgetState.error;
     default:
       return null;
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liveview_flutter/live_view/mapping/text_style_map.dart';
 
-MaterialStateProperty<TextStyle?>? materialTextStyle() =>
+WidgetStateProperty<TextStyle?>? materialTextStyle() =>
     (find.byType(FilledButton).evaluate().first.widget as FilledButton)
         .style
         ?.textStyle;
@@ -37,9 +37,9 @@ main() {
           }
         """);
     var style = materialTextStyle()!;
-    expect(style.resolve({MaterialState.pressed}),
+    expect(style.resolve({WidgetState.pressed}),
         const TextStyle(fontWeight: FontWeight.bold, color: Color(0xfff44336)));
-    expect(style.resolve({MaterialState.disabled}),
+    expect(style.resolve({WidgetState.disabled}),
         const TextStyle(fontWeight: FontWeight.w100));
   });
 }

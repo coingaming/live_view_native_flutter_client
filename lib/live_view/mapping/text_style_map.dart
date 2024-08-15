@@ -36,7 +36,7 @@ Map<String, FontStyle?> getFontStyleMap(BuildContext context) => {
       'normal': FontStyle.normal,
     };
 
-MaterialStateProperty<TextStyle?>? getMaterialTextStyle(
+WidgetStateProperty<TextStyle?>? getMaterialTextStyle(
     String? style, BuildContext context) {
   if (style == null) {
     return null;
@@ -44,22 +44,22 @@ MaterialStateProperty<TextStyle?>? getMaterialTextStyle(
   // this is there so you can do things like
   // buttonStyle: { textStyle: bold }
   if (!style.contains('{')) {
-    return MaterialStateProperty.resolveWith((states) {
+    return WidgetStateProperty.resolveWith((states) {
       return getTextStyle(style, context);
     });
     // this is for things like
     // buttonStyle: { pressed: { textStyle: bold }, disabled: { textStyle: w100 }}
   } else {
-    Map<MaterialState, TextStyle?> ret = {};
+    Map<WidgetState, TextStyle?> ret = {};
     for (var (key, val) in parseCss(style)) {
-      var state = getMaterialState(key);
+      var state = getWidgetState(key);
       if (state != null) {
         ret[state] = getTextStyle(val, context);
       }
     }
-    Set<MaterialState> existingKeys = ret.keys.toSet();
+    Set<WidgetState> existingKeys = ret.keys.toSet();
 
-    return MaterialStateProperty.resolveWith((states) {
+    return WidgetStateProperty.resolveWith((states) {
       var statesDefined = (states.intersection(existingKeys));
       if (statesDefined.isNotEmpty) {
         return ret[statesDefined.first];

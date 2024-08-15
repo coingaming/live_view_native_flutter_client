@@ -17,7 +17,7 @@ main() async {
     expect(find.firstText(), 'my page');
 
     view.handleLiveReloadMessage(
-        Message(event: PhoenixChannelEvent.custom('assets_change')));
+        Message(event: const PhoenixChannelEvent.custom('assets_change')));
 
     await tester.pumpAndSettle();
 
@@ -74,7 +74,7 @@ main() async {
     // we receive this event 3 times from the server
     for (var i = 0; i < 3; i++) {
       view.handleLiveReloadMessage(
-          Message(event: PhoenixChannelEvent.custom('assets_change')));
+          Message(event: const PhoenixChannelEvent.custom('assets_change')));
     }
 
     await tester.pumpAndSettle();

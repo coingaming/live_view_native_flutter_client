@@ -86,7 +86,7 @@ class FakePushMessage extends Push {
 
   @override
   Future<PushResponse> get future async {
-    return PushResponse(status: '200', response: '');
+    return const PushResponse(status: '200', response: '');
   }
 }
 
@@ -192,7 +192,7 @@ class FakeLiveSocket extends LiveSocket {
     required Map<String, dynamic> params,
     required Map<String, String> headers,
   }) {
-    var socket = FakePhoenixSocket(url, PhoenixSocketOptions());
+    var socket = FakePhoenixSocket(url, const PhoenixSocketOptions());
     socketsOpened.add(socket);
     return socket;
   }

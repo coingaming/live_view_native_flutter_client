@@ -1,10 +1,8 @@
+/// Converts a string property to a boolean value.
 bool? getBoolean(String? prop) {
-  switch (prop) {
-    case 'true':
-      return true;
-    case 'false':
-      return false;
-    default:
-      return null;
-  }
+  return switch (prop) {
+    'true' => true,
+    'false' => false,
+    _ => null,
+  };
 }

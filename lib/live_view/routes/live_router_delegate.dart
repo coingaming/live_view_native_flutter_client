@@ -8,14 +8,19 @@ import 'package:liveview_flutter/live_view/ui/node_state.dart';
 import 'package:liveview_flutter/live_view/ui/root_view/internal_view.dart';
 import 'package:xml/xml.dart';
 
+/// Represents a live page in the application
 class LivePage {
-  MaterialPage page;
-  List<Widget> widgets;
-  bool junk = false;
-  NodeState? rootState;
+  final MaterialPage page;
+  final List<Widget> widgets;
+  final NodeState? rootState;
 
-  LivePage(
-      {required this.page, required this.widgets, required this.rootState});
+  LivePage({
+    required this.page,
+    required this.widgets,
+    required this.rootState,
+  });
+
+  bool junk = false;
 
   @override
   String toString() =>
@@ -77,14 +82,15 @@ class LiveRouterDelegate extends RouterDelegate<List<RouteSettings>>
     // so we just do nothing in this case
     if (pages.length > 1) {
       pages.removeLast();
-      var pageName = pages.last.page.name;
-      if (pageName != null) {
-        await view.execHrefClick(pageName);
-      }
+      String? pageName = pages.last.page.name;
+
+      if (pageName != null) await view.execHrefClick(pageName);
+
       view.goBackNotifier.notify();
       notifyListeners();
       return true;
     }
+
     return true;
   }
 
@@ -105,7 +111,8 @@ class LiveRouterDelegate extends RouterDelegate<List<RouteSettings>>
       required List<Widget> widget,
       required NodeState? rootState}) {
     history[url] = widget;
-    var pageIndex = pages.length - 1;
+    int pageIndex = pages.length - 1;
+
     while (pageIndex >= 0 &&
         (pages.elementAtOrNull(pageIndex)?.page.name == url ||
             pages.elementAtOrNull(pageIndex)?.page.name == 'loading;$url')) {
@@ -115,6 +122,7 @@ class LiveRouterDelegate extends RouterDelegate<List<RouteSettings>>
       pages.elementAtOrNull(pageIndex)!.junk = true;
       pageIndex--;
     }
+
     pages.add(_createPage(RouteSettings(name: url), widget, rootState));
     notifyListeners();
   }
@@ -125,13 +133,13 @@ class LiveRouterDelegate extends RouterDelegate<List<RouteSettings>>
 
   LivePage _createPage(
       RouteSettings routeSettings, List<Widget> widgets, NodeState? rootState) {
-    var content = Builder(builder: (context) {
+    Builder content = Builder(builder: (context) {
       if (widgets.length == 1) {
         return widgets.first;
       }
 
       Widget? body;
-      for (var widget in widgets) {
+      for (final widget in widgets) {
         if (widget is LiveViewBody) {
           body = widget;
           break;
@@ -149,17 +157,18 @@ class LiveRouterDelegate extends RouterDelegate<List<RouteSettings>>
     });
 
     return LivePage(
-        page: routeSettings.name?.startsWith('/') == true
-            ? LiveCustomPage(
-                child: content,
-                name: routeSettings.name,
-                arguments: routeSettings.arguments,
-              )
-            : NoTransitionPage(
-                child: content,
-                name: routeSettings.name,
-                arguments: routeSettings.arguments),
-        widgets: widgets,
-        rootState: rootState);
+      page: routeSettings.name?.startsWith('/') == true
+          ? LiveCustomPage(
+              child: content,
+              name: routeSettings.name,
+              arguments: routeSettings.arguments,
+            )
+          : NoTransitionPage(
+              child: content,
+              name: routeSettings.name,
+              arguments: routeSettings.arguments),
+      widgets: widgets,
+      rootState: rootState,
+    );
   }
 }

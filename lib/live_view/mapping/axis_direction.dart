@@ -1,12 +1,10 @@
 import 'package:flutter/rendering.dart';
 
+/// Returns the corresponding `Axis` based on the input string property.
 Axis? getAxis(String? prop) {
-  switch (prop) {
-    case 'vertical':
-      return Axis.vertical;
-    case 'horizontal':
-      return Axis.horizontal;
-    default:
-      return null;
-  }
+  return switch (prop) {
+    'vertical' => Axis.vertical,
+    'horizontal' => Axis.horizontal,
+    _ => null,
+  };
 }

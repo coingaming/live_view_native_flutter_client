@@ -1,20 +1,18 @@
+/// A class representing a unique key for an element.
+/// This key is used for identification and comparison purposes.
 class ElementKey {
-  ElementKey(this.key);
-
   final String key;
+
+  ElementKey(this.key);
 
   @override
   bool operator ==(Object other) {
-    if (other is! ElementKey) return false;
-    if (key != other.key) return false;
-    return true;
+    return other is ElementKey && key == other.key;
   }
 
   @override
   int get hashCode => key.hashCode;
 
   @override
-  String toString() {
-    return 'ElementKey{key: $key}';
-  }
+  String toString() => 'ElementKey{key: $key}';
 }

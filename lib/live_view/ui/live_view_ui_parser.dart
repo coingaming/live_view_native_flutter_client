@@ -66,35 +66,37 @@ import 'package:liveview_flutter/live_view/ui/utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xml/xml.dart';
 
-var uuid = const Uuid();
+const Uuid uuid = Uuid();
 
 class LiveViewUiParser {
-  List<String> html;
+  final List<String> html;
   final Map<String, dynamic> _htmlVariables;
-  LiveView liveView;
-  String urlPath;
-  ViewType viewType;
+  final LiveView liveView;
+  final String urlPath;
+  final ViewType viewType;
 
-  LiveViewUiParser(
-      {required this.html,
-      required Map<String, dynamic> htmlVariables,
-      required this.liveView,
-      required this.urlPath,
-      required this.viewType})
-      : _htmlVariables = htmlVariables;
+  LiveViewUiParser({
+    required this.html,
+    required Map<String, dynamic> htmlVariables,
+    required this.liveView,
+    required this.urlPath,
+    required this.viewType,
+  }) : _htmlVariables = htmlVariables;
 
+  /// Parses the HTML and returns a tuple containing a list of widgets and an optional NodeState.
   (List<Widget>, NodeState?) parse() => parseHtml(html, _htmlVariables, []);
 
+  /// Recursively renders HTML by replacing placeholders with actual values.
   String recursiveRender(
     List<String> html,
     Map<String, dynamic> variables,
     String? componentId,
     List<String> nestedState,
   ) {
-    var res = html.joinWith((i) {
+    String result = html.joinWith((i) {
       if (variables.containsKey(i.toString())) {
-        var currentVariable = variables[i.toString()];
-        var injectedValue = currentVariable.toString().trim();
+        dynamic currentVariable = variables[i.toString()];
+        String injectedValue = currentVariable.toString().trim();
 
         while (currentVariable is Map) {
           currentVariable = currentVariable[i.toString()];
@@ -102,43 +104,39 @@ class LiveViewUiParser {
         }
 
         if (RegExp(r'^[ a-zA-Z_-]+=\".*\"$').hasMatch(injectedValue)) {
-          var split = injectedValue.indexOf('="');
-          var key = injectedValue.substring(0, split);
+          int split = injectedValue.indexOf('="');
+          String key = injectedValue.substring(0, split);
           return ' $key="[[flutterState key=$i]]" ';
         }
       }
       if (componentId != null) {
         return '[[flutterState key=$i component=$componentId]]';
       }
-
       return '[[flutterState key=$i]]';
     }).trim();
 
-    return res;
+    return result;
   }
 
+  /// Parses the HTML, converting it to widgets and optionally returning a NodeState.
   (List<Widget>, NodeState?) parseHtml(
     List<String> html,
     final Map<String, dynamic> variables,
     List<String> nestedState,
   ) {
-    var htmlVariables = Map<String, dynamic>.from(variables);
+    final Map<String, dynamic> htmlVariables =
+        Map<String, dynamic>.from(variables);
     if (html.isEmpty) {
       return ([const SizedBox.shrink()], null);
     }
 
-    var fullHtml = recursiveRender(
-      html,
-      variables,
-      null,
-      nestedState,
-    );
+    String fullHtml = recursiveRender(html, variables, null, nestedState);
+
+    // This is always injected in the XML and breaks the XML parser
+    // The XML parser doesn't support HTML-like attributes without a property
+    fullHtml = fullHtml.replaceFirst(RegExp('<div.*data-phx-main '), '<div ');
 
     late XmlDocument xml;
-
-    // this is always injected in the xml and breaks the xml parser
-    // the xml parser doesn't support html-like attributes without a property
-    fullHtml = fullHtml.replaceFirst(RegExp('<div.*data-phx-main '), '<div ');
 
     try {
       xml = XmlDocument.parse(fullHtml);
@@ -150,7 +148,7 @@ class LiveViewUiParser {
       }
     }
 
-    var state = NodeState(
+    final NodeState state = NodeState(
       urlPath: urlPath,
       liveView: liveView,
       node: xml.root,
@@ -162,33 +160,37 @@ class LiveViewUiParser {
     return (traverse(state), state);
   }
 
+  /// Traverses the node state and builds a list of widgets.
   static List<Widget> traverse(NodeState state) {
     return buildWidget(state);
   }
 
+  /// Builds widgets from the node state by handling different XML node types.
   static List<Widget> buildWidget(NodeState state) {
     if (state.node.nodeType == XmlNodeType.TEXT ||
         state.variables.containsKey('d')) {
       return renderDynamicComponent(state);
     } else if (state.node.nodeType == XmlNodeType.DOCUMENT) {
-      List<Widget> ret = [];
-      for (var node in state.node.nonEmptyChildren) {
-        ret.addAll(traverse(state.copyWith(node: node)));
+      final List<Widget> result = [];
+      for (final XmlNode node in state.node.nonEmptyChildren) {
+        result.addAll(traverse(state.copyWith(node: node)));
       }
-      return ret;
+      return result;
     } else if (state.node.nodeType == XmlNodeType.COMMENT) {
       return [const SizedBox.shrink()];
     } else if (state.node.nodeType == XmlNodeType.ELEMENT) {
-      var componentName = (state.node as XmlElement).name.qualified;
+      final String componentName = (state.node as XmlElement).name.qualified;
       return LiveViewUiRegistry.instance.buildWidget(componentName, state);
     } else {
-      reportError('unknown node type ${state.node.nodeType}');
+      reportError('Unknown node type ${state.node.nodeType}');
       return [const SizedBox.shrink()];
     }
   }
 
+  /// Registers the default components with the LiveView UI registry.
   static void registerDefaultComponents() {
-    LiveViewUiRegistry.instance
+    final LiveViewUiRegistry registry = LiveViewUiRegistry.instance;
+    registry
       ..add(['Scaffold'],
           (state) => [LiveScaffold(state: state, key: Key(uuid.v4()))])
       ..add(['Container'],
@@ -264,14 +266,14 @@ class LiveViewUiParser {
           (state) => [LiveViewBody(state: state, key: Key(uuid.v4()))])
       ..add(
           ['modal'], (state) => [LiveModal(state: state, key: Key(uuid.v4()))])
-      // Those xml nodes are transparent and aren't rendered in the client
-      // We just traverse them
+      // These XML nodes are transparent and aren't rendered in the client.
+      // We just traverse them.
       ..add(['compiled-lvn-stylesheet', 'div', 'flutter'], (state) {
-        List<Widget> ret = [];
-        for (var node in state.node.nonEmptyChildren) {
-          ret.addAll(traverse(state.copyWith(node: node)));
+        final List<Widget> result = [];
+        for (final XmlNode node in state.node.nonEmptyChildren) {
+          result.addAll(traverse(state.copyWith(node: node)));
         }
-        return ret;
+        return result;
       })
       ..add(['Checkbox'],
           (state) => [LiveCheckbox(state: state, key: Key(uuid.v4()))])

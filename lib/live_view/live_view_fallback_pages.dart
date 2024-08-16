@@ -7,6 +7,8 @@ import 'package:liveview_flutter/live_view/ui/errors/error_404.dart';
 import 'package:liveview_flutter/live_view/ui/errors/flutter_error_view.dart';
 import 'package:liveview_flutter/live_view/ui/errors/no_server_error_view.dart';
 
+/// LiveViewFallbackPages handles the fallback widgets used during various
+/// error and loading states in a LiveView app.
 class LiveViewFallbackPages {
   final bool _debugMode;
   final Widget Function(LiveView, [String?])? _connectingBuilder;
@@ -16,9 +18,9 @@ class LiveViewFallbackPages {
   final Widget Function(LiveView, FlutterErrorDetails)? _noServerErrorBuilder;
   final Widget Function(LiveView, FlutterErrorDetails)? _flutterErrorBuilder;
 
-  /// Constructs the fallback widgets
+  /// Constructs the fallback pages with optional custom builders.
   ///
-  /// [debugMode] determines if the fallback widget should be ignored in debug mode
+  /// If [debugMode] is true, custom builders will be ignored in debug mode.
   const LiveViewFallbackPages({
     bool debugMode = kDebugMode,
     Widget Function(LiveView, [String?])? connectingBuilder,
@@ -35,51 +37,29 @@ class LiveViewFallbackPages {
         _compilationErrorBuilder = compilationErrorBuilder,
         _flutterErrorBuilder = flutterErrorBuilder;
 
-  /// Returns the widget to be displayed when the page is loading
+  /// Builds the loading widget, using a custom builder if provided.
   Widget buildLoading(LiveView liveView, String url) {
-    return _wrapper(
+    return _buildFallbackWidget(
       liveView,
       customBuilder: _loadingBuilder,
       param: url,
-      defaultBuilder: () => Builder(
-        builder: (context) => Container(
-          color: Theme.of(context).colorScheme.surface,
-          child: Center(
-            child: CircularProgressIndicator(
-              value: liveView.disableAnimations == false ? null : 1,
-            ),
-          ),
-        ),
-      ),
+      defaultBuilder: () => _defaultLoadingWidget(liveView),
     );
   }
 
-  /// Returns the widget to be displayed when the client is connecting
+  /// Builds the connecting widget, using a custom builder if provided.
   Widget buildConnecting(LiveView liveView, [String? url]) {
-    return _wrapper(
+    return _buildFallbackWidget(
       liveView,
       customBuilder: _connectingBuilder,
       param: url,
-      defaultBuilder: () => Builder(
-        builder: (context) => Container(
-          color: Theme.of(context).colorScheme.surface,
-          child: Center(
-            child: CircularProgressIndicator(
-              value: liveView.disableAnimations == false ? null : 1,
-            ),
-          ),
-        ),
-      ),
+      defaultBuilder: () => _defaultLoadingWidget(liveView),
     );
   }
 
-  /// Returns the widget to be displayed in case of a compilation error
-  /// due to an error in the Dart code during the xml compilation
-  Widget buildCompilationError(
-    LiveView liveView,
-    Response response,
-  ) {
-    return _wrapper(
+  /// Builds the compilation error widget, using a custom builder if provided.
+  Widget buildCompilationError(LiveView liveView, Response response) {
+    return _buildFallbackWidget(
       liveView,
       customBuilder: _compilationErrorBuilder,
       param: response,
@@ -87,10 +67,9 @@ class LiveViewFallbackPages {
     );
   }
 
-  /// Returns the widget to be displayed in case when the requested
-  /// page is not found
+  /// Builds the not found error widget, using a custom builder if provided.
   Widget buildNotFoundError(LiveView liveView, Uri endpoint) {
-    return _wrapper(
+    return _buildFallbackWidget(
       liveView,
       customBuilder: _notFoundErrorBuilder,
       param: endpoint,
@@ -98,9 +77,9 @@ class LiveViewFallbackPages {
     );
   }
 
-  /// Returns the widget to be displayed in case of an error in the server
+  /// Builds the no server error widget, using a custom builder if provided.
   Widget buildNoServerError(LiveView liveView, FlutterErrorDetails details) {
-    return _wrapper(
+    return _buildFallbackWidget(
       liveView,
       customBuilder: _noServerErrorBuilder,
       param: details,
@@ -108,9 +87,9 @@ class LiveViewFallbackPages {
     );
   }
 
-  /// Returns the widget to be displayed in case of an error in the Flutter
+  /// Builds the Flutter error widget, using a custom builder if provided.
   Widget buildFlutterError(LiveView liveView, FlutterErrorDetails details) {
-    return _wrapper(
+    return _buildFallbackWidget(
       liveView,
       customBuilder: _flutterErrorBuilder,
       param: details,
@@ -118,7 +97,10 @@ class LiveViewFallbackPages {
     );
   }
 
-  Widget _wrapper<T>(
+  /// A helper method to wrap the logic for choosing between a custom
+  /// builder and a default widget. If [debugMode] is enabled, the custom
+  /// builder is ignored.
+  Widget _buildFallbackWidget<T>(
     LiveView liveView, {
     required Widget Function(LiveView, T)? customBuilder,
     required T param,
@@ -127,7 +109,20 @@ class LiveViewFallbackPages {
     if (!_debugMode && customBuilder != null) {
       return customBuilder(liveView, param);
     }
-
     return defaultBuilder();
+  }
+
+  /// A default loading widget to be used in the absence of a custom builder.
+  Widget _defaultLoadingWidget(LiveView liveView) {
+    return Builder(
+      builder: (context) => Container(
+        color: Theme.of(context).colorScheme.surface,
+        child: Center(
+          child: CircularProgressIndicator(
+            value: liveView.disableAnimations == false ? null : 1,
+          ),
+        ),
+      ),
+    );
   }
 }

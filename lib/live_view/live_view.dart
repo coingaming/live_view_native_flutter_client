@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:event_hub/event_hub.dart';
@@ -27,7 +28,9 @@ import 'package:liveview_flutter/live_view/ui/components/live_floating_action_bu
 import 'package:liveview_flutter/live_view/ui/components/live_navigation_rail.dart';
 import 'package:liveview_flutter/live_view/ui/components/live_persistent_footer_button.dart';
 import 'package:liveview_flutter/live_view/ui/dynamic_component.dart';
+import 'package:liveview_flutter/live_view/ui/live_view_ui_parser.dart';
 import 'package:liveview_flutter/live_view/ui/live_view_ui_registry.dart';
+import 'package:liveview_flutter/live_view/ui/node_state.dart';
 import 'package:liveview_flutter/live_view/ui/root_view/internal_view.dart';
 import 'package:liveview_flutter/live_view/ui/root_view/root_view.dart';
 import 'package:liveview_flutter/live_view/webdocs.dart';
@@ -38,10 +41,10 @@ import "package:universal_html/html.dart" as web_html;
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/io.dart';
 
-import './ui/live_view_ui_parser.dart';
-
+// Enum to define the types of views available.
 enum ViewType { deadView, liveView }
 
+// LiveSocket class manages WebSocket connections.
 class LiveSocket {
   PhoenixSocket create({
     required String url,
@@ -71,8 +74,10 @@ class LiveSocket {
   }
 }
 
+// Enum to define client types.
 enum ClientType { liveView, httpOnly, webDocs }
 
+// LiveView class handles the live view's lifecycle and WebSocket communication.
 class LiveView {
   final List<Plugin> _installedPlugins = [];
   bool catchExceptions = true;
@@ -80,7 +85,7 @@ class LiveView {
   ClientType clientType = ClientType.liveView;
 
   http.Client httpClient = http.Client();
-  var liveSocket = LiveSocket();
+  LiveSocket liveSocket = LiveSocket();
 
   Widget? onErrorWidget;
   late LiveRootView rootView;
@@ -106,7 +111,7 @@ class LiveView {
 
   List<Widget>? lastRender;
 
-  // dynamic global state
+  // Dynamic global state
   late StateNotifier changeNotifier;
   late LiveConnectionNotifier connectionNotifier;
   late ThemeSettings themeSettings;
@@ -114,7 +119,7 @@ class LiveView {
   late LiveRouterDelegate router;
   bool throttleSpammyCalls = true;
 
-  /// Holds all fallback widgets that will be used in the live view lifecycle
+  /// Holds all fallback widgets used during the live view lifecycle.
   LiveViewFallbackPages fallbackPages;
 
   LiveView({
@@ -128,9 +133,11 @@ class LiveView {
     themeSettings.httpClient = httpClient;
     rootView = LiveRootView(view: this);
 
+    // Register default components and exec actions.
     LiveViewUiParser.registerDefaultComponents();
     FlutterExecAction.registerDefaultExecs();
 
+    // Push a loading page.
     router.pushPage(
       url: 'loading',
       widget: connectingWidget(),
@@ -138,29 +145,32 @@ class LiveView {
     );
   }
 
+  /// Connects to the documentation service (only for web).
   void connectToDocs() {
-    if (!kIsWeb) {
-      return;
-    }
+    if (!kIsWeb) return;
     bindWebDocs(this);
   }
 
+  /// Establishes a connection to the live view server.
   Future<void> connect(String address) async {
     await _loadCookies();
 
     _clientId = const Uuid().v4();
-    var endpoint = Uri.parse(address);
+    Uri endpoint = Uri.parse(address);
     host = "${endpoint.host}:${endpoint.port}";
     themeSettings.httpClient = httpClient;
     themeSettings.host = "${endpoint.scheme}://$host";
     bool initialized = false;
 
-    currentUrl = endpoint.path == "" ? "/" : endpoint.path;
+    currentUrl = endpoint.path.isEmpty ? "/" : endpoint.path;
     endpointScheme = endpoint.scheme;
+
     try {
-      var response = await deadViewGetQuery(currentUrl);
+      // Try to get a dead view first.
+      http.Response response = await deadViewGetQuery(currentUrl);
       initialized = true;
 
+      // Handle HTTP errors.
       if (response.statusCode > 300) {
         if (response.statusCode == 404) {
           router.pushPage(
@@ -177,6 +187,7 @@ class LiveView {
         }
       }
     } on SocketException catch (e, stack) {
+      // Handle SocketException.
       router.pushPage(
         url: 'error',
         widget: [
@@ -188,6 +199,7 @@ class LiveView {
         rootState: null,
       );
     } catch (e, stack) {
+      // Handle generic exceptions.
       router.pushPage(
         url: 'error',
         widget: [
@@ -200,18 +212,19 @@ class LiveView {
       );
     }
 
-    if (!initialized) {
-      return autoReconnect(address);
-    }
+    if (!initialized) return autoReconnect(address);
+
     await reconnect();
   }
 
+  /// Attempts to reconnect after a delay.
   void autoReconnect(String address) {
     Timer(const Duration(seconds: 5), () => connect(address));
   }
 
+  /// Generates HTTP headers for requests.
   Map<String, String> httpHeaders() {
-    var headers = {
+    Map<String, String> headers = {
       'Accept-Language': WidgetsBinding.instance.platformDispatcher.locales
           .map((l) => l.toLanguageTag())
           .where((e) => e != 'C')
@@ -222,13 +235,12 @@ class LiveView {
       'Accept': 'text/flutter',
     };
 
-    if (cookie != null) {
-      headers['Cookie'] = cookie!;
-    }
+    if (cookie != null) headers['Cookie'] = cookie!;
 
     return headers;
   }
 
+  /// Reconnects to the live view and sets up the necessary components.
   Future<void> reconnect() async {
     await themeSettings.loadPreferences();
     await themeSettings.fetchCurrentTheme();
@@ -237,33 +249,33 @@ class LiveView {
     await _setupPhoenixChannel();
   }
 
+  /// Loads cookies from shared preferences.
   Future<void> _loadCookies() async {
-    var prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     cookie = prefs.getString('cookie');
   }
 
+  /// Parses and saves the cookie to shared preferences.
   Future<void> _parseAndSaveCookie(String cookieValue) async {
     cookie = Cookie.fromSetCookieValue(cookieValue).toString();
-    var prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('cookie', cookie.toString());
   }
 
+  /// Reads the initial session values from the HTML document.
   void _readInitialSession(Document content) {
     try {
-      _csrf = (content
+      _csrf = content
               .querySelector('meta[name="csrf-token"]')
-              ?.attributes['content']) ??
-          (content
-              .getElementsByTagName('csrf-token')
-              .first
-              .attributes['value'])!;
+              ?.attributes['content'] ??
+          content.getElementsByTagName('csrf-token').first.attributes['value']!;
 
-      _session = (content
+      _session = content
           .querySelector('[data-phx-session]')
-          ?.attributes['data-phx-session'])!;
-      _phxStatic = (content
+          ?.attributes['data-phx-session']!;
+      _phxStatic = content
           .querySelector('[data-phx-static]')
-          ?.attributes['data-phx-static'])!;
+          ?.attributes['data-phx-static']!;
 
       _liveViewId =
           (content.querySelector('[data-phx-main]')?.attributes['id'])!;
@@ -275,7 +287,7 @@ class LiveView {
             this,
             FlutterErrorDetails(
               exception: Exception(
-                "Unable to load the meta tags, please add the csrf-token, data-phx-session and data-phx-static tags in ${content.outerHtml}",
+                "Unable to load the meta tags. Please add the csrf-token, data-phx-session, and data-phx-static tags in ${content.outerHtml}",
               ),
               stack: stack,
             ),
@@ -286,8 +298,10 @@ class LiveView {
     }
   }
 
+  /// Determines the WebSocket scheme (wss or ws).
   String get websocketScheme => endpointScheme == 'https' ? 'wss' : 'ws';
 
+  /// Returns required socket parameters for WebSocket connections.
   Map<String, dynamic> _requiredSocketParams() => {
         '_platform': 'flutter',
         '_format': 'flutter',
@@ -295,6 +309,7 @@ class LiveView {
         'vsn': '2.0.0',
       };
 
+  /// Returns the full socket parameters, including CSRF token and client ID.
   Map<String, dynamic> _socketParams() => {
         ..._requiredSocketParams(),
         '_csrf_token': _csrf,
@@ -302,21 +317,25 @@ class LiveView {
         'client_id': _clientId,
       };
 
+  /// Returns the full socket parameters, including the URL.
   Map<String, dynamic> _fullsocketParams({bool redirect = false}) {
-    var params = {
+    Map<String, Object?> params = {
       'session': _session,
       'static': _phxStatic,
       'params': _socketParams()
     };
-    var nextUrl = "$endpointScheme://$host$currentUrl";
+    String nextUrl = "$endpointScheme://$host$currentUrl";
+
     if (redirect) {
       params['redirect'] = nextUrl;
     } else {
       params['url'] = nextUrl;
     }
+
     return params;
   }
 
+  /// Establishes the WebSocket connection.
   Future<void> _websocketConnect() async {
     _socket = liveSocket.create(
       url: "$websocketScheme://$host/live/websocket",
@@ -327,7 +346,8 @@ class LiveView {
     await _socket?.connect();
   }
 
-  _setupPhoenixChannel({bool redirect = false}) async {
+  /// Sets up the Phoenix channel for communication with the server.
+  Future<void> _setupPhoenixChannel({bool redirect = false}) async {
     _channel = _socket!.addChannel(
       topic: "lv:$_liveViewId",
       parameters: _fullsocketParams(redirect: redirect),
@@ -340,15 +360,15 @@ class LiveView {
     }
   }
 
+  /// Redirects to a specified URL.
   Future<void> redirectTo(String path) async {
     redirectToUrl = path;
     await _channel?.push('phx_leave', {}).future;
   }
 
+  /// Sets up the live reload functionality.
   Future<void> _setupLiveReload() async {
-    if (endpointScheme == 'https') {
-      return;
-    }
+    if (endpointScheme == 'https') return;
 
     _liveReloadSocket = liveSocket.create(
       url: "$websocketScheme://$host/phoenix/live_reload/socket/websocket",
@@ -357,8 +377,10 @@ class LiveView {
         'Accept': 'text/flutter',
       },
     );
-    var liveReload = _liveReloadSocket
+
+    PhoenixChannel liveReload = _liveReloadSocket
         .addChannel(topic: "phoenix:live_reload", parameters: {});
+
     liveReload.messages.listen(handleLiveReloadMessage);
 
     try {
@@ -371,7 +393,10 @@ class LiveView {
     }
   }
 
-  handleMessage(Message event) {
+  /// Handles incoming messages from the WebSocket.
+  void handleMessage(Message event) {
+    log('Received message: ${event}');
+
     if (event.event.value == 'phx_close') {
       if (redirectToUrl != null) {
         currentUrl = redirectToUrl!;
@@ -379,12 +404,15 @@ class LiveView {
       }
       return;
     }
+
     if (event.event.value == 'diff') {
-      return handleDiffMessage(event.payload!);
+      handleDiffMessage(event.payload!);
     }
+
     if (event.payload == null || !event.payload!.containsKey('response')) {
       return;
     }
+
     if (event.payload!['response']?.containsKey('rendered') ?? false) {
       handleRenderedMessage(event.payload!['response']!['rendered'],
           viewType: ViewType.liveView);
@@ -393,28 +421,32 @@ class LiveView {
     }
   }
 
-  handleRenderedMessage(Map<String, dynamic> rendered,
+  /// Handles rendered messages from the server.
+  void handleRenderedMessage(Map<String, dynamic> rendered,
       {ViewType viewType = ViewType.liveView}) {
-    var elements = List<String>.from(rendered['s']);
+    List<String> elements = List<String>.from(rendered['s']);
 
-    var render = LiveViewUiParser(
+    (List<Widget>, NodeState?) render = LiveViewUiParser(
       html: elements,
       htmlVariables: expandVariables(rendered),
       liveView: this,
       urlPath: currentUrl,
       viewType: viewType,
     ).parse();
+
     lastRender = render.$1;
     connectionNotifier.wipeState();
     router.updatePage(url: currentUrl, widget: render.$1, rootState: render.$2);
   }
 
-  handleDiffMessage(Map<String, dynamic> diff) {
+  /// Handles diff messages from the server.
+  void handleDiffMessage(Map<String, dynamic> diff) {
     changeNotifier.setDiff(diff);
   }
 
+  /// Handles live reload messages from the server.
   Future<void> handleLiveReloadMessage(Message event) async {
-    if (event.event.value == 'assets_change' && isLiveReloading == false) {
+    if (event.event.value == 'assets_change' && !isLiveReloading) {
       eventHub.fire('live-reload:start');
       isLiveReloading = true;
 
@@ -428,8 +460,9 @@ class LiveView {
     }
   }
 
-  sendEvent(ExecLiveEvent event) {
-    var eventData = {
+  /// Sends an event to the server.
+  void sendEvent(ExecLiveEvent event) {
+    Map<String, dynamic> eventData = {
       'type': event.type,
       'event': event.name,
       'value': event.value
@@ -443,20 +476,21 @@ class LiveView {
     }
   }
 
+  /// Returns a widget displayed while connecting.
   List<Widget> connectingWidget() {
     return [InternalView(child: fallbackPages.buildConnecting(this))];
   }
 
+  /// Returns a widget displayed while loading a page.
   List<Widget> loadingWidget(String url) {
-    var previousWidgets = router.lastRealPage?.widgets ?? [];
+    List<Widget> previousWidgets = router.lastRealPage?.widgets ?? [];
 
     List<Widget> ret = [
       InternalView(child: fallbackPages.buildLoading(this, url))
     ];
 
-    // we keep the previous navigation items to avoid flickering with the load screen
-    // the loading page doesn't stay very long but it's enough to cause a flickering
-    var previousNavigation = previousWidgets
+    // Retain previous navigation items to avoid flickering during load.
+    List<Widget> previousNavigation = previousWidgets
         .where((element) =>
             element is LiveDrawer ||
             element is LiveAppBar ||
@@ -473,20 +507,23 @@ class LiveView {
     return ret;
   }
 
+  /// Switches the theme and saves the settings.
   Future<void> switchTheme(String? themeName, String? themeMode) async {
-    if (themeName == null || themeMode == null) {
-      return;
-    }
+    if (themeName == null || themeMode == null) return;
+
     return themeSettings.setTheme(themeName, themeMode);
   }
 
+  /// Saves the current theme settings.
   Future<void> saveCurrentTheme() => themeSettings.save();
 
+  /// Executes a live patch request to the server.
   Future<void> livePatch(String url) async {
     if (clientType == ClientType.webDocs) {
       web_html.window.parent
           ?.postMessage({'type': 'live-patch', 'url': url}, "*");
     }
+
     router.pushPage(
       url: 'loading;$url',
       widget: loadingWidget(url),
@@ -495,58 +532,66 @@ class LiveView {
     redirectTo(url);
   }
 
+  /// Sends a form submission as a dead view request.
   Future<void> postForm(Map<String, dynamic> formValues) async {
-    deadViewPostQuery(currentUrl, formValues);
+    await deadViewPostQuery(currentUrl, formValues);
   }
 
+  /// Executes a dead view POST request.
   Future<http.Response> deadViewPostQuery(
       String url, Map<String, dynamic> formValues) async {
     formValues['_csrf_token'] = _csrf;
-    var r = await httpClient.post(shortUrlToUri(currentUrl),
+    http.Response response = await httpClient.post(shortUrlToUri(currentUrl),
         headers: httpHeaders(), body: formValues);
 
-    if (r.headers['set-cookie'] != null) {
-      _parseAndSaveCookie(r.headers['set-cookie']!);
+    if (response.headers['set-cookie'] != null) {
+      _parseAndSaveCookie(response.headers['set-cookie']!);
     }
 
-    if (r.statusCode >= 200 && r.statusCode < 300) {
-      var content = html.parse(r.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      Document content = html.parse(response.body);
       _readInitialSession(content);
     }
 
-    if ((r.statusCode == 302 || r.statusCode == 301) &&
-        r.headers['location'] != null) {
-      await execHrefClick(r.headers['location']!);
-      return r;
+    if ((response.statusCode == 302 || response.statusCode == 301) &&
+        response.headers['location'] != null) {
+      await execHrefClick(response.headers['location']!);
+      return response;
     }
 
     handleRenderedMessage({
-      's': [r.body]
+      's': [response.body]
     }, viewType: ViewType.deadView);
 
-    return r;
+    return response;
   }
 
+  /// Executes a dead view GET request.
   Future<http.Response> deadViewGetQuery(String url) async {
-    var r = await httpClient.get(shortUrlToUri(url), headers: httpHeaders());
-    if (r.headers['set-cookie'] != null) {
-      await _parseAndSaveCookie(r.headers['set-cookie']!);
+    http.Response response =
+        await httpClient.get(shortUrlToUri(url), headers: httpHeaders());
+
+    if (response.headers['set-cookie'] != null) {
+      await _parseAndSaveCookie(response.headers['set-cookie']!);
     }
 
-    if (r.statusCode == 200) {
-      var content = html.parse(r.body);
+    if (response.statusCode == 200) {
+      Document content = html.parse(response.body);
       _readInitialSession(content);
     }
-    return r;
+
+    return response;
   }
 
+  /// Handles href clicks by performing a dead view GET request.
   Future<void> execHrefClick(String url) async {
     router.pushPage(
       url: 'loading;$url',
       widget: loadingWidget(url),
       rootState: router.pages.lastOrNull?.rootState,
     );
-    var response = await deadViewGetQuery(url);
+
+    http.Response response = await deadViewGetQuery(url);
 
     currentUrl = url;
     redirectToUrl = url;
@@ -558,24 +603,29 @@ class LiveView {
     await _channel?.push('phx_leave', {}).future;
   }
 
+  /// Converts a short URL to a fully qualified URI.
   Uri shortUrlToUri(String url) {
-    var uri = Uri.parse("$endpointScheme://$host$url");
-    var queryParams = Map<String, dynamic>.from(uri.queryParametersAll);
+    Uri uri = Uri.parse("$endpointScheme://$host$url");
+    Map<String, dynamic> queryParams =
+        Map<String, dynamic>.from(uri.queryParametersAll);
     queryParams['_lvn[format]'] = 'flutter';
 
     return uri.replace(queryParameters: queryParams);
   }
 
+  /// Handles the back navigation.
   Future<void> goBack() async {
     if (clientType == ClientType.webDocs) {
       web_html.window.parent?.postMessage({'type': 'go-back'}, "*");
     }
+
     await router.navigatorKey?.currentState?.maybePop();
     router.notify();
   }
 
+  /// Installs plugins and registers their widgets and exec actions.
   Future<void> installPlugins(List<Plugin> plugins) async {
-    for (var plugin in plugins) {
+    for (Plugin plugin in plugins) {
       plugin.registerWidgets(LiveViewUiRegistry.instance);
       plugin.registerExecs(LiveViewExecRegistry.instance);
     }

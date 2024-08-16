@@ -34,6 +34,9 @@ import 'package:liveview_flutter/live_view/mapping/visual_density.dart';
 import 'package:liveview_flutter/live_view/state/state_child.dart';
 import 'package:liveview_flutter/live_view/ui/node_state.dart';
 
+/// A mixin that provides helper methods to extract various attributes from a
+/// given set of attributes. These methods map attributes to corresponding
+/// Flutter types (e.g., Color, EdgeInsets, Icon).
 mixin AttributeHelpers {
   String? getAttribute(String name);
 

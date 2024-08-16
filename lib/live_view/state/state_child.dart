@@ -3,8 +3,13 @@ import 'package:liveview_flutter/live_view/ui/components/state_widget.dart';
 import 'package:liveview_flutter/live_view/ui/live_view_ui_parser.dart';
 import 'package:liveview_flutter/live_view/ui/node_state.dart';
 import 'package:liveview_flutter/live_view/ui/utils.dart';
+import 'package:xml/xml.dart';
 
 class StateChild {
+  /// Handles the child structure for widgets that can accept either a single child
+  /// or multiple children. If multiple children are present, they are wrapped
+  /// in a `Column` widget. If a single child is present, it is returned directly.
+  ///
   /// In Flutter, components can accept either a single child or multiple children but not both.
   /// How the client reconciles this is to add a `Column` widget if needed to behave more like HTML.
   /// Raw text elements in the xml payload are transformed into a basic Flutter `Text` widget.
@@ -31,121 +36,106 @@ class StateChild {
   /// </ElevatedButton>
   /// ```
   static Widget singleChild(NodeState state) {
-    var children = state.node.nonEmptyChildren;
-    switch (children.length) {
-      case 0:
-        return const SizedBox.shrink();
-      case 1:
-        var components =
-            (LiveViewUiParser.traverse(state.copyWith(node: children[0])));
-        if (components.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        if (components.length == 1) {
-          return components.first;
-        }
-        return Column(
-            crossAxisAlignment: CrossAxisAlignment.start, children: components);
-      default:
-        return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: multipleChildren(state));
-    }
+    List<XmlNode> children = state.node.nonEmptyChildren;
+
+    return switch (children.length) {
+      0 => const SizedBox.shrink(),
+      1 => _handleSingleChild(state, children),
+      _ => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: multipleChildren(state)),
+    };
   }
 
-  /// Extracts multiple children from the XML nodes
-  /// This is needed for widgets accepting multiple children such as List or SegmentedButton
+  /// Handles a single child case, parsing the child into Flutter components.
+  static Widget _handleSingleChild(NodeState state, List<XmlNode> children) {
+    List<Widget> components =
+        LiveViewUiParser.traverse(state.copyWith(node: children[0]));
+
+    if (components.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    if (components.length == 1) {
+      return components.first;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: components,
+    );
+  }
+
+  /// Extracts multiple children from the XML nodes.
+  /// This is needed for widgets that accept multiple children, such as List or SegmentedButton.
   static List<Widget> multipleChildren(NodeState state) {
-    List<Widget> ret = [];
+    List<Widget> childrenWidgets = [];
 
-    for (var node in state.node.nonEmptyChildren) {
-      ret.addAll(LiveViewUiParser.traverse(state.copyWith(node: node)));
+    for (XmlNode node in state.node.nonEmptyChildren) {
+      childrenWidgets
+          .addAll(LiveViewUiParser.traverse(state.copyWith(node: node)));
     }
-    return ret;
+
+    return childrenWidgets;
   }
 
+  /// Extracts child widgets of a specific type from the list of widgets,
+  /// filtering based on type and the `as` attribute.
   static List<LiveStateWidget> extractChildren<Type extends LiveStateWidget>(
       List<Widget> children) {
-    List<LiveStateWidget> ret = [];
-    var refType = (Type.toString()
+    List<LiveStateWidget> result = [];
+    String refType = Type.toString()
         .replaceAll('Live', '')
         .replaceAll('Attribute', '')
-        .toLowerCase());
-    for (var child in children) {
+        .toLowerCase();
+
+    for (Widget child in children) {
       if (child is Type) {
-        ret.add(child);
-      }
-      if (child is LiveStateWidget &&
+        result.add(child);
+      } else if (child is LiveStateWidget &&
           child.state.node.getAttribute('as') == refType) {
-        ret.add(child);
+        result.add(child);
       }
     }
-    children.removeWhere((e) => ret.contains(e));
-    return ret;
+
+    children.removeWhere((widget) => result.contains(widget));
+    return result;
   }
 
-  /// Sometimes Flutter doesn't map well to an XML structure and can accept widget as properties which aren't children.
-  /// This is what ```extractChild``` is used for.
-  ///
-  /// As an example, the widget ```SegmentedButton``` accepts a list of ```ButtonSegment``` as children (which aren't widgets in Flutter).
-  /// And the ```ButtonSegment``` itself accepts a text and an icon.
-  ///
-  /// These three ButtonSegment are equivalent:
-  /// ```xml
-  /// <ButtonSegment name="1" label="my label" icon="home" />
-  /// <ButtonSegment name="1" icon="home">
-  ///   <Text>my label</Text>
-  /// </ButtonSegment>
-  /// <ButtonSegment name="1">
-  ///   <Text>my label</Text>
-  ///   <Icon name="home" />
-  /// </ButtonSegment>
-  /// ```
-  /// Here, Text and Icon are taken by default since the code is using
-  /// ```dart
-  /// icon ??= StateChild.extractChild<LiveIcon>(children);
-  /// label ??= StateChild.extractChild<LiveText>(children);
-  /// ```
-  /// But if you want to use a different widget for the icon and label, you can use the ```as``` property
-  /// ```xml
-  /// <ButtonSegment name="1" icon="home">
-  ///   <Row as="text">
-  ///     <Text>my</Text><Text>label</Text>
-  ///   </Row>
-  ///   <Text as="icon">hello</Text>
-  /// </ButtonSegment>
-  /// ```
-  /// The Row here will be picked up as the ```text``` property. This concept is useful to map unusual widgets to properties.
+  /// Extracts a child widget of a specific type from the list of widgets,
+  /// using the `as` attribute if necessary.
   static LiveStateWidget? extractChild<Type extends LiveStateWidget>(
       List<Widget> children) {
-    LiveStateWidget? ret;
-    var refType = (Type.toString()
+    LiveStateWidget? result;
+    String refType = Type.toString()
         .replaceAll('Live', '')
         .replaceAll('Attribute', '')
-        .toLowerCase());
-    for (var child in children) {
+        .toLowerCase();
+
+    for (Widget child in children) {
       if (child is Type) {
-        ret = child;
-      }
-      if (child is LiveStateWidget &&
+        result = child;
+      } else if (child is LiveStateWidget &&
           child.state.node.getAttribute('as') == refType) {
-        ret = child;
+        result = child;
       }
     }
-    children.removeWhere((e) => e == ret);
 
-    return ret;
+    children.removeWhere((widget) => widget == result);
+    return result;
   }
 
+  /// Extracts a widget of a specific type from the list of widgets.
   static Type? extractWidgetChild<Type extends Widget>(List<Widget> children) {
-    Type? ret;
-    for (var child in children) {
+    Type? result;
+
+    for (Widget child in children) {
       if (child is Type) {
-        ret = child;
+        result = child;
       }
     }
-    children.removeWhere((e) => e == ret);
 
-    return ret;
+    children.removeWhere((widget) => widget == result);
+    return result;
   }
 }

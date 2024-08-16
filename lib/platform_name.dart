@@ -2,16 +2,18 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 
+/// Returns the name of the platform on which the app is currently running.
 String getPlatformName() {
-  return kIsWeb
-      ? "Web"
-      : switch (Platform) {
-          _ when Platform.isAndroid => "Android",
-          _ when Platform.isIOS => "IOS",
-          _ when Platform.isFuchsia => "Fuchsia",
-          _ when Platform.isLinux => "Linux",
-          _ when Platform.isMacOS => "MacOS",
-          _ when Platform.isWindows => "Windows",
-          _ => "Unknown",
-        };
+  // Check if the app is running on the web.
+  if (kIsWeb) return "Web";
+
+  return switch (Platform.operatingSystem) {
+    'android' => "Android",
+    'ios' => "iOS",
+    'fuchsia' => "Fuchsia",
+    'linux' => "Linux",
+    'macos' => "MacOS",
+    'windows' => "Windows",
+    _ => "Unknown", // Fallback for unsupported platforms.
+  };
 }

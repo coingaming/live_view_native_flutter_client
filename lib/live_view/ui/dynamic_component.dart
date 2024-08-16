@@ -1,71 +1,99 @@
 import 'package:flutter/widgets.dart';
 import 'package:liveview_flutter/live_view/mapping/css.dart';
 import 'package:liveview_flutter/live_view/mapping/text_replacement.dart';
+import 'package:liveview_flutter/live_view/state/element_key.dart';
 import 'package:liveview_flutter/live_view/ui/components/live_dynamic_component.dart';
 import 'package:liveview_flutter/live_view/ui/node_state.dart';
 
-Map<String, dynamic> expandVariables(Map<String, dynamic> diff,
-    {Map<String, dynamic> templates = const {},
-    Map<String, dynamic>? component}) {
-  var ret = Map<String, dynamic>.from(diff);
-  var nextTemplate = Map<String, dynamic>.from(templates);
+/// Expands variables in the `diff` map based on templates and component data.
+///
+/// This function recursively replaces placeholders in the `diff` map with actual values
+/// from the `templates` and `component` maps, supporting nested structures.
+Map<String, dynamic> expandVariables(
+  Map<String, dynamic> diff, {
+  Map<String, dynamic> templates = const {},
+  Map<String, dynamic>? component,
+}) {
+  // Create copies of the input maps to avoid mutating them directly
+  final Map<String, dynamic> result = Map<String, dynamic>.from(diff);
+  final Map<String, dynamic> nextTemplate =
+      Map<String, dynamic>.from(templates);
 
-  if (ret.containsKey('c')) {
-    component = ret.remove('c');
+  // If the 'c' key exists in the result, update the component map
+  if (result.containsKey('c')) {
+    component = result.remove('c');
   }
 
+  // Replace numeric keys in the result map with corresponding values from the component map
   if (component != null) {
-    for (var key in ret.keys) {
-      if (key.isNumber() && ret[key] is num) {
-        ret[key] = component[ret[key].toString()];
+    for (String key in result.keys) {
+      if (key.isNumber() && result[key] is num) {
+        result[key] = component[result[key].toString()];
       }
     }
   }
 
-  if (ret.containsKey('p') && ret['p'] is Map) {
-    nextTemplate.addAll(ret['p']);
+  // Merge 'p' data from the result into the next template
+  if (result.containsKey('p') && result['p'] is Map) {
+    nextTemplate.addAll(result['p']);
   }
-  if (ret.containsKey('d') && ret['d'] is List && !ret.containsKey('0')) {
-    var count = 0;
-    if (ret['d'].isEmpty) {
-      return ret;
+
+  // Handle 'd' data as a list and recursively expand variables
+  if (result.containsKey('d') &&
+      result['d'] is List &&
+      !result.containsKey('0')) {
+    int count = 0;
+    if (result['d'].isEmpty) {
+      return result;
     }
-    for (List<dynamic> forList in ret['d']) {
-      var localVar = {
-        for (var localVar in forList.indexed) '${localVar.$1}': localVar.$2
+
+    for (List<dynamic> forList in result['d']) {
+      final Map<String, dynamic> localVar = {
+        for (final localVar in forList.indexed) '${localVar.$1}': localVar.$2
       };
-      ret[count.toString()] = localVar;
+      result[count.toString()] = localVar;
       count++;
     }
-    return expandVariables(ret, templates: nextTemplate, component: component);
+    return expandVariables(result,
+        templates: nextTemplate, component: component);
   }
-  if (ret.containsKey('s') && ret['s'] is int) {
-    ret['s'] = nextTemplate[ret['s'].toString()];
+
+  // Replace 's' key in the result map with corresponding value from the next template
+  if (result.containsKey('s') && result['s'] is int) {
+    result['s'] = nextTemplate[result['s'].toString()];
   }
-  return ret.map((k, v) {
-    if (v is Map) {
+
+  // Recursively expand variables in nested maps
+  return result.map((k, v) {
+    if (v is Map<String, dynamic>) {
       return MapEntry(
-          k,
-          expandVariables(Map<String, dynamic>.from(v),
-              templates: nextTemplate, component: component));
+        k,
+        expandVariables(Map<String, dynamic>.from(v),
+            templates: nextTemplate, component: component),
+      );
     }
     return MapEntry(k, v);
   });
 }
 
+/// Renders dynamic components based on the current node state.
+///
+/// This function parses and renders dynamic components using the state parser,
+/// handling nested and repeated components as well.
 List<Widget> renderDynamicComponent(NodeState state) {
-  List<Widget> comps = [];
+  final List<Widget> components = [];
 
+  // Handle dynamic data 'd' in the state variables
   if (state.variables.containsKey('d')) {
     if (state.variables['d'].isEmpty) {
       return [];
     }
 
-    for (var i = 0; i < state.variables['d'].length; i++) {
-      var newState = List<String>.from(state.nestedState);
-      newState.add(i.toString());
+    for (int i = 0; i < state.variables['d'].length; i++) {
+      final List<String> newState = List<String>.from(state.nestedState)
+        ..add(i.toString());
 
-      comps.addAll(
+      components.addAll(
         state.parser
             .parseHtml(
               List<String>.from(state.variables['s']),
@@ -75,23 +103,25 @@ List<Widget> renderDynamicComponent(NodeState state) {
             .$1,
       );
     }
-    return comps;
+    return components;
   }
 
-  var dynamicKeys = extractDynamicKeys(state.node.toString());
-  for (var elementKey in dynamicKeys) {
-    var currentVariables = state.variables[elementKey.key];
+  // Extract dynamic keys and handle dynamic rendering
+  final List<ElementKey> dynamicKeys =
+      extractDynamicKeys(state.node.toString());
+  for (final ElementKey elementKey in dynamicKeys) {
+    final dynamic currentVariables = state.variables[elementKey.key];
 
     if (currentVariables is! Map || !currentVariables.containsKey('d')) {
       continue;
     }
 
-    for (var i = 0; i < currentVariables['d'].length; i++) {
-      var newState = List<String>.from(state.nestedState);
-      newState.add(elementKey.key);
-      newState.add(i.toString());
+    for (int i = 0; i < currentVariables['d'].length; i++) {
+      final List<String> newState = List<String>.from(state.nestedState)
+        ..add(elementKey.key)
+        ..add(i.toString());
 
-      comps.addAll(
+      components.addAll(
         state.parser
             .parseHtml(
               List<String>.from(currentVariables['s']),
@@ -103,12 +133,10 @@ List<Widget> renderDynamicComponent(NodeState state) {
     }
   }
 
-  // this happens if we have two components being rendered in the same piece of text
-  // something like [[flutterState key="0"]][[flutterState key="1"]]
-  // we need to divide this in two components
-  if (dynamicKeys.length > 1 && comps.isEmpty) {
-    for (var elementKey in dynamicKeys) {
-      comps.addAll(
+  // Handle cases where multiple components are rendered in the same text piece
+  if (dynamicKeys.length > 1 && components.isEmpty) {
+    for (final ElementKey elementKey in dynamicKeys) {
+      components.addAll(
         state.parser.parseHtml(
           ["[[flutterState key=${elementKey.key}]]"],
           state.variables,
@@ -118,5 +146,8 @@ List<Widget> renderDynamicComponent(NodeState state) {
     }
   }
 
-  return (comps.isNotEmpty) ? comps : [LiveDynamicComponent(state: state)];
+  // Return the rendered components, or a LiveDynamicComponent if none were found
+  return (components.isNotEmpty)
+      ? components
+      : [LiveDynamicComponent(state: state)];
 }

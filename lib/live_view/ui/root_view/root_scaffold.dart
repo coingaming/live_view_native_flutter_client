@@ -18,11 +18,15 @@ import 'package:liveview_flutter/live_view/ui/node_state.dart';
 import 'package:liveview_flutter/live_view/ui/root_view/root_app_bar.dart';
 import 'package:liveview_flutter/live_view/ui/root_view/root_bottom_navigation_bar.dart';
 import 'package:throttled/throttled.dart';
+import 'package:xml/xml.dart';
 
+/// Notification to trigger showing a bottom sheet.
 class ShowBottomSheetNotification extends Notification {}
 
+/// Root scaffold for the LiveView app.
 class RootScaffold extends StatefulWidget {
   final LiveView view;
+
   const RootScaffold({super.key, required this.view});
 
   @override
@@ -40,31 +44,37 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
   LiveFloatingActionButton? floatingActionButton;
   FloatingActionButtonLocation? floatingActionButtonLocation;
   List<LiveStateWidget> persistentButtons = [];
-  final key = GlobalKey<ScaffoldState>();
-
+  final GlobalKey<ScaffoldState> key = GlobalKey<ScaffoldState>();
   NodeState? rootNode;
 
   @override
   void initState() {
+    super.initState();
+
+    // Subscribe to live reload events
     widget.view.eventHub.on('live-reload:start', (_) => setState(() {}));
     widget.view.eventHub.on('live-reload:end', (_) => setState(() {}));
+
+    // Listen for route changes and diff updates
     widget.view.router.addListener(routeChange);
     widget.view.changeNotifier.addListener(onDiffUpdateEvent);
+
+    // Initialize state
     onStateChange(currentVariables);
-    super.initState();
   }
 
+  /// Handles updates when the state changes due to diffs.
   void onDiffUpdateEvent() {
-    if (!mounted) {
-      return;
-    }
-    var currentRoot = widget.view.router.pages.last.rootState;
-    if (currentRoot == null) {
-      return;
-    }
+    if (!mounted) return;
+
+    NodeState? currentRoot = widget.view.router.pages.last.rootState;
+    if (currentRoot == null) return;
+
     rootNode = currentRoot;
-    var lastLiveDiff =
+    Map<String, dynamic> lastLiveDiff =
         widget.view.changeNotifier.getNestedDiff(currentRoot.nestedState);
+
+    // If any listened keys are present in the diff, update the state
     if (lastLiveDiff.keys.any((key) => isKeyListened(ElementKey(key)))) {
       currentVariables.addAll(lastLiveDiff);
       onStateChange(lastLiveDiff);
@@ -73,10 +83,9 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
     }
   }
 
+  /// Handles state changes by reloading attributes.
   void onStateChange(Map<String, dynamic> diff) {
-    if (rootNode == null) {
-      return;
-    }
+    if (rootNode == null) return;
     reloadAttributes(rootNode!.node, []);
   }
 
@@ -87,6 +96,7 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
     super.dispose();
   }
 
+  /// Handles route changes by resetting computed attributes and updating the root node.
   void routeChange() {
     setState(() {
       computedAttributes = VariableAttributes({}, []);
@@ -94,22 +104,24 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
     });
   }
 
+  /// Wraps the child widget with a navigation rail if present.
   Widget mapRailBar(Widget child) {
-    if (railBar == null) {
-      return child;
-    }
+    if (railBar == null) return child;
     return Row(children: [railBar!, Expanded(child: child)]);
   }
 
+  /// Binds the floating action button location to the current node's state.
   void bindFloatingActionButtonLocation() {
     rootNode = widget.view.router.pages.last.rootState;
     if (rootNode != null) {
-      var viewBody = childrenNodesOf(rootNode!.node, 'viewBody').firstOrNull;
+      XmlNode? viewBody =
+          childrenNodesOf(rootNode!.node, 'viewBody').firstOrNull;
       if (viewBody != null) {
-        var attributes = bindChildVariableAttributes(
+        Map<String, String?> attributes = bindChildVariableAttributes(
             viewBody, ['floatingActionButtonLocation'], rootNode!.variables);
-        var location = getFloatingActionButtonLocation(
-            attributes['floatingActionButtonLocation']);
+        FloatingActionButtonLocation? location =
+            getFloatingActionButtonLocation(
+                attributes['floatingActionButtonLocation']);
         if (location != null) {
           floatingActionButtonLocation = location;
         }
@@ -117,15 +129,13 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
     }
   }
 
+  /// Retrieves a root attribute by name.
   String? getRootAttribute(String name) {
-    if (widget.view.router.pages.last.rootState == null) return null;
+    NodeState? rootState = widget.view.router.pages.last.rootState;
+    if (rootState == null) return null;
 
-    var attributes = bindChildVariableAttributes(
-      widget.view.router.pages.last.rootState!.node,
-      [name],
-      widget.view.router.pages.last.rootState!.variables,
-    );
-
+    Map<String, String?> attributes = bindChildVariableAttributes(
+        rootState.node, [name], rootState.variables);
     return attributes[name];
   }
 
@@ -133,8 +143,10 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
   Widget build(BuildContext context) {
     bindFloatingActionButtonLocation();
 
+    // Check if the current page contains global navigation widgets
     if (widget.view.router.pages.last.containsGlobalNavigationWidgets) {
-      var widgets = List<Widget>.from(widget.view.router.pages.last.widgets);
+      List<Widget> widgets =
+          List<Widget>.from(widget.view.router.pages.last.widgets);
 
       railBar = StateChild.extractWidgetChild<LiveNavigationRail>(widgets);
       drawer = StateChild.extractWidgetChild<LiveDrawer>(widgets);
@@ -145,20 +157,22 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
           StateChild.extractChildren<LivePersistentFooterButton>(widgets);
       hasAppBar = childrenNodesOf(rootNode!.node, 'AppBar').firstOrNull != null;
       hasBottomNavigationBar =
-          (childrenNodesOf(rootNode!.node, 'BottomAppBar').firstOrNull ??
-                  childrenNodesOf(rootNode!.node, 'BottomNavigationBar')
-                      .firstOrNull) !=
-              null;
+          childrenNodesOf(rootNode!.node, 'BottomAppBar').firstOrNull != null ||
+              childrenNodesOf(rootNode!.node, 'BottomNavigationBar')
+                      .firstOrNull !=
+                  null;
     } else {
+      // Reset attributes if no global navigation widgets are present
       railBar = null;
       drawer = null;
+      endDrawer = null;
       floatingActionButton = null;
       hasAppBar = false;
       hasBottomNavigationBar = false;
       persistentButtons = [];
     }
 
-    var child = SafeArea(
+    Widget child = SafeArea(
       child: Router(
         routerDelegate: widget.view.router,
         backButtonDispatcher: RootBackButtonDispatcher(),
@@ -187,9 +201,9 @@ class _RootScaffoldState extends State<RootScaffold> with ComputedAttributes {
         },
         child: NotificationListener<ShowBottomSheetNotification>(
           onNotification: (_) {
-            var widgets =
+            List<Widget> widgets =
                 List<Widget>.from(widget.view.router.pages.last.widgets);
-            var bottomSheet =
+            LiveBottomSheet? bottomSheet =
                 StateChild.extractWidgetChild<LiveBottomSheet>(widgets);
             if (bottomSheet == null) {
               debugPrint('No bottomsheet to show');

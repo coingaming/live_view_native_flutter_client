@@ -16,7 +16,6 @@ class ThemeSettings extends ChangeNotifier {
   ThemeData? _darkTheme;
 
   ThemeMode get themeMode => _themeMode;
-
   ThemeData? get lightTheme => _lightTheme;
   ThemeData? get darkTheme => _darkTheme;
 
@@ -24,8 +23,10 @@ class ThemeSettings extends ChangeNotifier {
     if (_themeName == name && _themeMode.modeAsString() == mode) {
       return;
     }
+
     _themeName = name;
     _themeMode = ThemeModeStringify.parse(mode);
+
     return fetchCurrentTheme();
   }
 
@@ -59,6 +60,7 @@ class ThemeSettings extends ChangeNotifier {
     if (content['useMaterial3'] == null) {
       content['useMaterial3'] = true;
     }
+
     try {
       switch (getDisplayedThemeMode()) {
         case ThemeMode.light:
@@ -89,8 +91,10 @@ class ThemeSettings extends ChangeNotifier {
     if (_themeMode == ThemeMode.light || _themeMode == ThemeMode.dark) {
       return _themeMode;
     }
-    var systemBrightness =
+
+    Brightness systemBrightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
+
     if (systemBrightness == Brightness.light) {
       return ThemeMode.light;
     } else {
@@ -100,6 +104,7 @@ class ThemeSettings extends ChangeNotifier {
 
   Future<void> fetchCurrentTheme() async {
     await loadCurrentTheme();
+
     try {
       await httpClient
           .get(Uri.parse(

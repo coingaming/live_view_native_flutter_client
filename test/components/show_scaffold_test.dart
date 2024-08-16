@@ -110,7 +110,7 @@ main() async {
       matchesGoldenFile('show_scaffold_removed_test.png'),
     );
 
-    await view.handleRenderedMessage({
+    view.handleRenderedMessage({
       's': [
         """
           <flutter>

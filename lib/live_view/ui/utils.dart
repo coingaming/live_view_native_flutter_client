@@ -28,16 +28,23 @@ extension JoinMethod on List<String> {
   String joinWith(String Function(int index) separator) {
     int index = -1;
     Iterator<String> iterator = this.iterator;
+
     if (!iterator.moveNext()) return "";
+    String first = iterator.current.toString();
 
-    String first = iterator.current;
     if (!iterator.moveNext()) return first;
-
     StringBuffer buffer = StringBuffer(first);
-    while (iterator.moveNext()) {
-      buffer
-        ..write(separator(++index))
-        ..write(iterator.current);
+
+    if (separator(index++).isEmpty) {
+      do {
+        buffer.write(iterator.current.toString());
+      } while (iterator.moveNext());
+    } else {
+      do {
+        buffer
+          ..write(separator(index++))
+          ..write(iterator.current.toString());
+      } while (iterator.moveNext());
     }
 
     return buffer.toString();
@@ -56,9 +63,8 @@ extension Matches on String {
 /// Optionally accepts a [reviver] function for custom decoding.
 dynamic tryJsonDecode(String? source,
     {Object? Function(Object?, Object?)? reviver}) {
-  if (source == null) {
-    return null;
-  }
+  if (source == null) return null;
+
   try {
     return jsonDecode(source, reviver: reviver);
   } on FormatException {
